@@ -56,13 +56,12 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 class AvatarActivity : ComponentActivity() {
-    lateinit var avatarView: AvatarView
-        private set
+    private var avatarView: AvatarView? = null
 
     private lateinit var avatar: Avatar
 
     private val avatarController: AvatarController
-        get() = avatarView.avatarController ?: error("Do not have a controller, have you called init?")
+        get() = avatarView?.avatarController ?: error("Do not have a controller, have you called init?")
 
     val avatarId: String by lazy {
         intent.getStringExtra(EXTRA_AVATAR_ID) ?: error("Avatar ID is required")
@@ -109,8 +108,7 @@ class AvatarActivity : ComponentActivity() {
                             errorState = errorState,
                             extraMessage,
                             onAvatarViewCreated = {
-                                avatarView = it
-                                avatarView.init(avatar, lifecycleScope)
+                                avatarView = it.apply { init(avatar, lifecycleScope) }
                                 setupController()
                             },
                             onConnectClick = { toConnect ->
@@ -130,6 +128,21 @@ class AvatarActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    override fun onPause() {
+        super.onPause()
+        avatarView?.onPause()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        avatarView?.onResume()
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        avatarView?.cleanup()
     }
 
     private fun setupController() {
