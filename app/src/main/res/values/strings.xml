@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">AvatarKit-Demo</string>
+    <string name="title_activity_avatar">AvatarActivity</string>
 </resources>
