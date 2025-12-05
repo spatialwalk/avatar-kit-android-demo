@@ -198,7 +198,9 @@ class AvatarActivity : ComponentActivity() {
 
     private fun sendJson(filePath: String) {
         lifecycleScope.launch(Dispatchers.IO) {
-            val ana = Json.decodeFromStream<AudioAndAnimation>(assets.open(filePath))
+            val ana = assets.open(filePath).use {
+                Json.decodeFromStream<AudioAndAnimation>(it)
+            }
             val reqId = avatarController.send(Base64.decode(ana.audio), true)
             avatarController.receiveAnimations(ana.animations.map(Base64::decode), reqId)
         }
