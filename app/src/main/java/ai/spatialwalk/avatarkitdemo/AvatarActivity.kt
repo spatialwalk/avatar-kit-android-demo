@@ -6,6 +6,7 @@ import ai.spatialwalk.avatarkit.AvatarController.ConnectionState
 import ai.spatialwalk.avatarkit.AvatarKit
 import ai.spatialwalk.avatarkit.AvatarView
 import ai.spatialwalk.avatarkit.assets.AvatarManager
+import ai.spatialwalk.avatarkit.performance.FrameRateMonitor.FrameRateInfo
 import ai.spatialwalk.avatarkit.player.AvatarPlayer.ConversationState
 import ai.spatialwalk.avatarkitdemo.ui.theme.AvatarKitDemoTheme
 import android.content.res.Configuration
@@ -19,10 +20,12 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -79,6 +82,8 @@ class AvatarActivity : ComponentActivity() {
     private var conversationState: ConversationState by mutableStateOf(ConversationState.Idle)
     private var errorState: Throwable? by mutableStateOf(null)
     private var extraMessage: String by mutableStateOf("")
+    private var frameRateInfo: FrameRateInfo by mutableStateOf(FrameRateInfo(emptyList()))
+
 
     private var pcmSendingJob: Job? = null
         set(value) {
@@ -113,6 +118,7 @@ class AvatarActivity : ComponentActivity() {
                             conversationState = conversationState,
                             errorState = errorState,
                             extraMessage,
+                            frameRateInfo,
                             onAvatarViewCreated = {
                                 avatarView = it.apply { init(avatar, lifecycleScope) }
                                 setupController()
@@ -167,6 +173,9 @@ class AvatarActivity : ComponentActivity() {
         avatarController.onError = { error ->
             errorState = error
         }
+        avatarController.onFrameRateInfo = { info ->
+            frameRateInfo = info
+        }
     }
 
     private fun sendPcm(filePath: String) {
@@ -217,6 +226,7 @@ fun AvatarScreen(
     conversationState: ConversationState,
     errorState: Throwable?,
     extraMessage: String,
+    frameRateInfo: FrameRateInfo,
     onAvatarViewCreated: (AvatarView) -> Unit,
     onConnectClick: (toConnect: Boolean) -> Unit,
     onInterruptClick: () -> Unit,
@@ -269,6 +279,7 @@ fun AvatarScreen(
                     conversationState = conversationState,
                     errorState = errorState,
                     extraMessage = extraMessage,
+                    frameRateInfo = frameRateInfo,
                     onConnectClick = onConnectClick,
                     onInterruptClick = onInterruptClick,
                     modifier = Modifier
@@ -321,6 +332,7 @@ fun ControlTab(
     conversationState: ConversationState,
     errorState: Throwable?,
     extraMessage: String,
+    frameRateInfo: FrameRateInfo,
     onConnectClick: (toConnect: Boolean) -> Unit,
     onInterruptClick: () -> Unit,
     modifier: Modifier = Modifier
@@ -347,6 +359,10 @@ fun ControlTab(
             }
         }
 
+        Spacer(Modifier.height(8.dp))
+
+        PerformancePane(frameRateInfo)
+
         StateInformation(connectionState, conversationState, errorState, extraMessage)
     }
 }
@@ -363,7 +379,8 @@ fun StateInformation(
         if (AvatarKit.isSdkDriven()) {
             Text(
                 text = "Connection: $connectionState",
-                style = MaterialTheme.typography.bodyLarge
+                style = MaterialTheme.typography.bodyLarge,
+                modifier = Modifier.padding(top = 8.dp)
             )
         }
         Text(
@@ -386,6 +403,19 @@ fun StateInformation(
                 modifier = Modifier.padding(top = 8.dp)
             )
         }
+    }
+}
+
+@Composable
+fun PerformancePane(
+    frameRateInfo: FrameRateInfo,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier) {
+        Text("FPS: %.1f".format(frameRateInfo.fps()))
+        Text("Frame time: %.2f".format(frameRateInfo.averageFrameTime()))
+        Text("Stage1 Avg: %.2f".format(frameRateInfo.averageFlame2SplatTime()))
+        Text("Stage2 Avg: %.2f".format(frameRateInfo.averageUploadSplatTime()))
     }
 }
 
