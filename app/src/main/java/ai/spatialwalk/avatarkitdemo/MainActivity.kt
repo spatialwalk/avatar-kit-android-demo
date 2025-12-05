@@ -1,5 +1,6 @@
 package ai.spatialwalk.avatarkitdemo
 
+import ai.spatialwalk.avatarkit.AvatarKit
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -52,7 +53,9 @@ fun MainScreen(modifier: Modifier = Modifier) {
     var selectedAvatar by remember { mutableStateOf(allAvatars.first()) }
     val context = LocalContext.current
 
-    val launchAvatarActivity = {
+    val launchAvatarActivity: (Boolean) -> Unit = { isSdkDriven ->
+        val drivingMode = if (isSdkDriven) AvatarKit.DrivingServiceMode.SDK else AvatarKit.DrivingServiceMode.HOST
+        AvatarKit.initialize(context, "", AvatarKit.Configuration("test", drivingMode))
         val intent = Intent(context, AvatarActivity::class.java).apply {
             putExtra(AvatarActivity.EXTRA_AVATAR_ID, selectedAvatar.id)
         }
@@ -94,13 +97,17 @@ fun MainScreen(modifier: Modifier = Modifier) {
             horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Button(
-                onClick = launchAvatarActivity,
+                onClick = {
+                    launchAvatarActivity(true)
+                },
                 modifier = Modifier.weight(1f)
             ) {
                 Text("SDK Driven")
             }
             OutlinedButton(
-                onClick = launchAvatarActivity,
+                onClick = {
+                    launchAvatarActivity(false)
+                },
                 modifier = Modifier.weight(1f)
             ) {
                 Text("Host Driven")

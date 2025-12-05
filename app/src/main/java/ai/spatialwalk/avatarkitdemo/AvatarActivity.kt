@@ -3,6 +3,7 @@ package ai.spatialwalk.avatarkitdemo
 import ai.spatialwalk.avatarkit.Avatar
 import ai.spatialwalk.avatarkit.AvatarController
 import ai.spatialwalk.avatarkit.AvatarController.ConnectionState
+import ai.spatialwalk.avatarkit.AvatarKit
 import ai.spatialwalk.avatarkit.AvatarView
 import ai.spatialwalk.avatarkit.assets.AvatarManager
 import ai.spatialwalk.avatarkit.player.AvatarPlayer.ConversationState
@@ -54,6 +55,11 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.decodeFromStream
+import java.io.File
+import kotlin.io.encoding.Base64
 
 class AvatarActivity : ComponentActivity() {
     private var avatarView: AvatarView? = null
@@ -121,7 +127,13 @@ class AvatarActivity : ComponentActivity() {
                             onInterruptClick = {
                                 avatarController.interrupt()
                             },
-                            onPcmFileClick = this::sendPcm,
+                            onFileClick = { file ->
+                                if (AvatarKit.isSdkDriven()) {
+                                    sendPcm(file)
+                                } else {
+                                    sendJson(file)
+                                }
+                            },
                             modifier = Modifier.padding(innerPadding)
                         )
                     }
@@ -157,11 +169,11 @@ class AvatarActivity : ComponentActivity() {
         }
     }
 
-    private fun sendPcm(fileName: String) {
+    private fun sendPcm(filePath: String) {
         pcmSendingJob = lifecycleScope.launch(Dispatchers.IO) {
             try {
                 avatarController.interrupt()
-                val audioDataStream = assets.open("pcm/$fileName")
+                val audioDataStream = assets.open(filePath)
                 while (isActive) {
                     val seconds = 1
                     val bufferSize = 16000 * 2 * seconds
@@ -184,6 +196,14 @@ class AvatarActivity : ComponentActivity() {
         }
     }
 
+    private fun sendJson(filePath: String) {
+        lifecycleScope.launch(Dispatchers.IO) {
+            val ana = Json.decodeFromStream<AudioAndAnimation>(assets.open(filePath))
+            val reqId = avatarController.send(Base64.decode(ana.audio), true)
+            avatarController.receiveAnimations(ana.animations.map(Base64::decode), reqId)
+        }
+    }
+
     companion object {
         const val EXTRA_AVATAR_ID = "avatar_id"
     }
@@ -198,15 +218,20 @@ fun AvatarScreen(
     onAvatarViewCreated: (AvatarView) -> Unit,
     onConnectClick: (toConnect: Boolean) -> Unit,
     onInterruptClick: () -> Unit,
-    onPcmFileClick: (String) -> Unit,
+    onFileClick: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
     val context = LocalContext.current
 
-    val pcmFiles = remember {
-        context.assets.list("pcm")?.toList() ?: emptyList()
+    val files = remember {
+        val folder = if (AvatarKit.isSdkDriven()) "pcm" else "json"
+        context.assets
+            .list(folder)
+            ?.toList()
+            .orEmpty()
+            .map { "$folder/$it" }
     }
 
     val avatarViewComposable: @Composable (Modifier) -> Unit = { mod ->
@@ -220,7 +245,7 @@ fun AvatarScreen(
 
     val controlPanelComposable: @Composable (Modifier) -> Unit = { mod ->
         var selectedTabIndex by remember { mutableIntStateOf(0) }
-        val tabs = listOf("Control", "Info")
+        val tabs = listOf("Main", "Audio")
 
         Column(
             modifier = mod
@@ -240,19 +265,17 @@ fun AvatarScreen(
                 0 -> ControlTab(
                     connectionState = connectionState,
                     conversationState = conversationState,
+                    errorState = errorState,
+                    extraMessage = extraMessage,
                     onConnectClick = onConnectClick,
                     onInterruptClick = onInterruptClick,
-                    pcmFiles = pcmFiles,
-                    onPcmFileClick = onPcmFileClick,
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(16.dp)
                 )
-                1 -> InfoTab(
-                    connectionState = connectionState,
-                    conversationState = conversationState,
-                    errorState = errorState,
-                    extraMessage = extraMessage,
+                1 -> AudioTab(
+                    fileList = files,
+                    onFileClick = onFileClick,
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(16.dp)
@@ -294,10 +317,10 @@ fun AvatarScreen(
 fun ControlTab(
     connectionState: ConnectionState,
     conversationState: ConversationState,
+    errorState: Throwable?,
+    extraMessage: String,
     onConnectClick: (toConnect: Boolean) -> Unit,
     onInterruptClick: () -> Unit,
-    pcmFiles: List<String>,
-    onPcmFileClick: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(modifier = modifier) {
@@ -308,7 +331,7 @@ fun ControlTab(
             val clickToConnect = connectionState != ConnectionState.Connected
             Button(
                 onClick = { onConnectClick(clickToConnect) },
-                enabled = connectionState != ConnectionState.Connecting,
+                enabled = connectionState != ConnectionState.Connecting && AvatarKit.isSdkDriven(),
                 modifier = Modifier.weight(1f)
             ) {
                 Text(if (clickToConnect) "Connect" else "Disconnect")
@@ -322,35 +345,25 @@ fun ControlTab(
             }
         }
 
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f)
-                .padding(top = 16.dp)
-        ) {
-            items(pcmFiles) { fileName ->
-                ListItem(
-                    headlineContent = { Text(fileName) },
-                    modifier = Modifier.clickable { onPcmFileClick(fileName) }
-                )
-            }
-        }
+        StateInformation(connectionState, conversationState, errorState, extraMessage)
     }
 }
 
 @Composable
-fun InfoTab(
+fun StateInformation(
     connectionState: ConnectionState,
     conversationState: ConversationState,
     errorState: Throwable?,
     extraMessage: String,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier) {
-        Text(
-            text = "Connection: $connectionState",
-            style = MaterialTheme.typography.bodyLarge
-        )
+        if (AvatarKit.isSdkDriven()) {
+            Text(
+                text = "Connection: $connectionState",
+                style = MaterialTheme.typography.bodyLarge
+            )
+        }
         Text(
             text = "Conversation: $conversationState",
             style = MaterialTheme.typography.bodyLarge,
@@ -373,3 +386,37 @@ fun InfoTab(
         }
     }
 }
+
+@Composable
+fun AudioTab(
+    fileList: List<String>,
+    onFileClick: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(modifier = modifier) {
+
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f)
+                .padding(top = 16.dp)
+        ) {
+            items(fileList) { fileName ->
+                ListItem(
+                    headlineContent = { Text(File(fileName).name) },
+                    modifier = Modifier.clickable { onFileClick(fileName) }
+                )
+            }
+        }
+    }
+}
+
+private fun AvatarKit.isSdkDriven(): Boolean {
+    return config.drivingServiceMode == AvatarKit.DrivingServiceMode.SDK
+}
+
+@Serializable
+data class AudioAndAnimation(
+    val audio: String,
+    val animations: List<String>,
+)
