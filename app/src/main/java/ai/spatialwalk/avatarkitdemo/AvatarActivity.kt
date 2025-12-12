@@ -3,8 +3,9 @@ package ai.spatialwalk.avatarkitdemo
 import ai.spatialwalk.avatarkit.Avatar
 import ai.spatialwalk.avatarkit.AvatarController
 import ai.spatialwalk.avatarkit.AvatarController.ConnectionState
-import ai.spatialwalk.avatarkit.AvatarKit
+import ai.spatialwalk.avatarkit.AvatarSDK
 import ai.spatialwalk.avatarkit.AvatarView
+import ai.spatialwalk.avatarkit.DrivingServiceMode
 import ai.spatialwalk.avatarkit.assets.AvatarManager
 import ai.spatialwalk.avatarkit.performance.FrameRateMonitor.FrameRateInfo
 import ai.spatialwalk.avatarkit.player.AvatarPlayer.ConversationState
@@ -134,7 +135,7 @@ class AvatarActivity : ComponentActivity() {
                                 avatarController.interrupt()
                             },
                             onFileClick = { file ->
-                                if (AvatarKit.isSdkDriven()) {
+                                if (AvatarSDK.isSdkDriven()) {
                                     sendPcm(file)
                                 } else {
                                     sendJson(file)
@@ -171,7 +172,7 @@ class AvatarActivity : ComponentActivity() {
             connectionState = state
         }
         avatarController.onError = { error ->
-            errorState = error
+            errorState = Exception(error.message)
         }
         avatarController.onFrameRateInfo = { info ->
             frameRateInfo = info
@@ -211,7 +212,7 @@ class AvatarActivity : ComponentActivity() {
                 Json.decodeFromStream<AudioAndAnimation>(it)
             }
             val reqId = avatarController.send(Base64.decode(ana.audio), true)
-            avatarController.receiveAnimations(ana.animations.map(Base64::decode), reqId)
+            avatarController.yield(ana.animations.map(Base64::decode), reqId)
         }
     }
 
@@ -238,7 +239,7 @@ fun AvatarScreen(
     val context = LocalContext.current
 
     val files = remember {
-        val folder = if (AvatarKit.isSdkDriven()) "pcm" else "json"
+        val folder = if (AvatarSDK.isSdkDriven()) "pcm" else "json"
         context.assets
             .list(folder)
             ?.toList()
@@ -291,7 +292,6 @@ fun AvatarScreen(
                     onFileClick = onFileClick,
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(16.dp)
                 )
             }
         }
@@ -345,7 +345,7 @@ fun ControlTab(
             val clickToConnect = connectionState != ConnectionState.Connected
             Button(
                 onClick = { onConnectClick(clickToConnect) },
-                enabled = connectionState != ConnectionState.Connecting && AvatarKit.isSdkDriven(),
+                enabled = connectionState != ConnectionState.Connecting && AvatarSDK.isSdkDriven(),
                 modifier = Modifier.weight(1f)
             ) {
                 Text(if (clickToConnect) "Connect" else "Disconnect")
@@ -376,7 +376,7 @@ fun StateInformation(
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier) {
-        if (AvatarKit.isSdkDriven()) {
+        if (AvatarSDK.isSdkDriven()) {
             Text(
                 text = "Connection: $connectionState",
                 style = MaterialTheme.typography.bodyLarge,
@@ -431,7 +431,6 @@ fun AudioTab(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f)
-                .padding(top = 16.dp)
         ) {
             items(fileList) { fileName ->
                 ListItem(
@@ -443,8 +442,8 @@ fun AudioTab(
     }
 }
 
-private fun AvatarKit.isSdkDriven(): Boolean {
-    return config.drivingServiceMode == AvatarKit.DrivingServiceMode.SDK
+private fun AvatarSDK.isSdkDriven(): Boolean {
+    return config.drivingServiceMode == DrivingServiceMode.SDK
 }
 
 @Serializable

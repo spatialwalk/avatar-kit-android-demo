@@ -1,6 +1,10 @@
 package ai.spatialwalk.avatarkitdemo
 
-import ai.spatialwalk.avatarkit.AvatarKit
+import ai.spatialwalk.avatarkit.AvatarSDK
+import ai.spatialwalk.avatarkit.Configuration
+import ai.spatialwalk.avatarkit.DrivingServiceMode
+import ai.spatialwalk.avatarkit.Environment
+import ai.spatialwalk.avatarkit.LogLevel
 import android.app.Application
 
 class AvatarApplication : Application() {
@@ -10,6 +14,6 @@ class AvatarApplication : Application() {
     }
 
     private fun initAvatarKit() {
-        AvatarKit.initialize(this, "", AvatarKit.Configuration("test"))
+        AvatarSDK.initialize(this, "", Configuration(Environment.valueOf("test"), DrivingServiceMode.SDK, LogLevel.ERROR))
     }
 }
