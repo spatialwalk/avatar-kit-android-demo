@@ -1,5 +1,6 @@
 package ai.spatialwalk.avatarkitdemo
 
+import ai.spatialwalk.avatarkit.AudioFormat
 import ai.spatialwalk.avatarkit.AvatarSDK
 import ai.spatialwalk.avatarkit.Configuration
 import ai.spatialwalk.avatarkit.DrivingServiceMode
@@ -35,9 +36,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import ai.spatialwalk.avatarkitdemo.ui.theme.AvatarKitDemoTheme
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.decodeFromStream
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -58,16 +56,22 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun MainScreen(modifier: Modifier = Modifier) {
     val context = LocalContext.current
-    val allAvatars = remember {
-        context.assets.open("avatar_list.json").use {
-            Json.decodeFromStream<AvatarList>(it)
-        }.avatars
-    }
-    var selectedAvatar by remember { mutableStateOf(allAvatars.first()) }
+    var selectedAvatar by remember { mutableStateOf(testAvatars.first()) }
 
     val launchAvatarActivity: (Boolean) -> Unit = { isSdkDriven ->
         val drivingMode = if (isSdkDriven) DrivingServiceMode.SDK else DrivingServiceMode.HOST
-        AvatarSDK.initialize(context, "", Configuration(Environment.valueOf("test"), drivingMode, LogLevel.ALL))
+        // You should only initialize the AvatarSDK once, and call it in Application.onCreate()
+        AvatarSDK.initialize(
+            context,
+            "", // Set your app id here
+            Configuration(
+                Environment.cn, // Environment.cn or Environment.intl
+                AudioFormat(16000),
+                drivingServiceMode =  drivingMode,
+                logLevel =  LogLevel.ALL
+            )
+        )
+        AvatarSDK.sessionToken = "" // Set your session token here
         val intent = Intent(context, AvatarActivity::class.java).apply {
             putExtra(AvatarActivity.EXTRA_AVATAR_ID, selectedAvatar.id)
         }
@@ -88,7 +92,7 @@ fun MainScreen(modifier: Modifier = Modifier) {
                 .weight(1f)
                 .fillMaxWidth()
         ) {
-            items(allAvatars) { avatar ->
+            items(testAvatars) { avatar ->
                 ListItem(
                     headlineContent = { Text(avatar.name) },
                     leadingContent = {
@@ -128,13 +132,15 @@ fun MainScreen(modifier: Modifier = Modifier) {
     }
 }
 
-@Serializable
 data class AvatarInfo(
     val id: String,
     val name: String,
 )
 
-@Serializable
-data class AvatarList(
-    val avatars: List<AvatarInfo>,
+// @See: https://docs.spatialreal.ai/overview/test-avatars
+val testAvatars = listOf(
+    AvatarInfo("93dd60f8-d9e2-47cf-973e-d75e10cfc951", "Rohan"),
+    AvatarInfo("17a9aed2-4b35-4eb8-8bf2-675a278bd80d", "Dr.Kellan"),
+    AvatarInfo("2a5170ff-8d1f-4d10-ac50-0ab4893df328", "Priya"),
+    AvatarInfo("ab7117a9-f954-44df-8c25-06d28e4f6ec7", "Josh"),
 )

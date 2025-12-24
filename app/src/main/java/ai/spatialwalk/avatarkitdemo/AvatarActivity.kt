@@ -1,5 +1,6 @@
 package ai.spatialwalk.avatarkitdemo
 
+import ai.spatialwalk.avatarkit.AudioFormat
 import ai.spatialwalk.avatarkit.Avatar
 import ai.spatialwalk.avatarkit.AvatarController
 import ai.spatialwalk.avatarkit.AvatarController.ConnectionState
@@ -59,11 +60,14 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.decodeFromStream
 import java.io.File
 import kotlin.io.encoding.Base64
+import kotlin.io.path.Path
+import kotlin.io.path.nameWithoutExtension
 
 class AvatarActivity : ComponentActivity() {
     private var avatarView: AvatarView? = null
@@ -211,7 +215,8 @@ class AvatarActivity : ComponentActivity() {
             val ana = assets.open(filePath).use {
                 Json.decodeFromStream<AudioAndAnimation>(it)
             }
-            val reqId = avatarController.send(Base64.decode(ana.audio), true)
+            val sampleRate = Path(filePath).nameWithoutExtension.toInt()
+            val reqId = avatarController.yield(Base64.decode(ana.audio), true, AudioFormat(sampleRate))
             avatarController.yield(ana.animations.map(Base64::decode), reqId)
         }
     }
@@ -414,8 +419,8 @@ fun PerformancePane(
     Column(modifier) {
         Text("FPS: %.1f".format(frameRateInfo.fps()))
         Text("Frame time: %.2f".format(frameRateInfo.averageFrameTime()))
-        Text("Stage1 Avg: %.2f".format(frameRateInfo.averageFlame2SplatTime()))
-        Text("Stage2 Avg: %.2f".format(frameRateInfo.averageUploadSplatTime()))
+        Text("Stage1 Avg: %.2f".format(frameRateInfo.averageStage1Time()))
+        Text("Stage2 Avg: %.2f".format(frameRateInfo.averageStage2Time()))
     }
 }
 
@@ -448,6 +453,16 @@ private fun AvatarSDK.isSdkDriven(): Boolean {
 
 @Serializable
 data class AudioAndAnimation(
+    @SerialName("audio_base64")
     val audio: String,
+    @SerialName("animation_messages_base64")
     val animations: List<String>,
+    @SerialName("sample_rate")
+    val sampleRate: Int,
+    @SerialName("audio_format")
+    val audioFormat: String,
+    @SerialName("connection_id")
+    val connectionId: String,
+    @SerialName("req_id")
+    val reqId: String,
 )
