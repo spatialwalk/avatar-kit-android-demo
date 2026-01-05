@@ -36,6 +36,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import ai.spatialwalk.avatarkitdemo.ui.theme.AvatarKitDemoTheme
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -57,25 +59,28 @@ class MainActivity : ComponentActivity() {
 fun MainScreen(modifier: Modifier = Modifier) {
     val context = LocalContext.current
     var selectedAvatar by remember { mutableStateOf(testAvatars.first()) }
+    val coroutineScope = rememberCoroutineScope()
 
     val launchAvatarActivity: (Boolean) -> Unit = { isSdkDriven ->
-        val drivingMode = if (isSdkDriven) DrivingServiceMode.SDK else DrivingServiceMode.HOST
-        // You should only initialize the AvatarSDK once, and call it in Application.onCreate()
-        AvatarSDK.initialize(
-            context,
-            "", // Set your app id here
-            Configuration(
-                Environment.cn, // Environment.cn or Environment.intl
-                AudioFormat(16000),
-                drivingServiceMode =  drivingMode,
-                logLevel =  LogLevel.ALL
+        coroutineScope.launch {
+            val drivingMode = if (isSdkDriven) DrivingServiceMode.SDK else DrivingServiceMode.HOST
+            // You should only initialize the AvatarSDK once, and call it in Application.onCreate()
+            AvatarSDK.initialize(
+                context,
+                "app_mj8526em_9fpt9s", // Set your app id here
+                Configuration(
+                    Environment.cn, // Environment.cn or Environment.intl
+                    AudioFormat(16000),
+                    drivingServiceMode =  drivingMode,
+                    logLevel =  LogLevel.ALL
+                )
             )
-        )
-        AvatarSDK.sessionToken = "" // Set your session token here
-        val intent = Intent(context, AvatarActivity::class.java).apply {
-            putExtra(AvatarActivity.EXTRA_AVATAR_ID, selectedAvatar.id)
+            AvatarSDK.sessionToken = fetchToken()
+            val intent = Intent(context, AvatarActivity::class.java).apply {
+                putExtra(AvatarActivity.EXTRA_AVATAR_ID, selectedAvatar.id)
+            }
+            context.startActivity(intent)
         }
-        context.startActivity(intent)
     }
 
     Column(
@@ -130,6 +135,10 @@ fun MainScreen(modifier: Modifier = Modifier) {
             }
         }
     }
+}
+
+private suspend fun fetchToken(): String {
+    return "" // Fetch token here
 }
 
 data class AvatarInfo(
