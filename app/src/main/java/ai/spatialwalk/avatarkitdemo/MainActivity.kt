@@ -67,7 +67,7 @@ fun MainScreen(modifier: Modifier = Modifier) {
             // You should only initialize the AvatarSDK once, and call it in Application.onCreate()
             AvatarSDK.initialize(
                 context,
-                "app_mj8526em_9fpt9s", // Set your app id here
+                "", // Set your app id here
                 Configuration(
                     Environment.cn, // Environment.cn or Environment.intl
                     AudioFormat(16000),
